@@ -66,7 +66,7 @@ Process& Process::operator=(Process other) {
   return (*this);
 }
 
-void Process::set_shape(std::unique_ptr<TH1> shape, bool set_rate) {
+void Process::set_shape(std::unique_ptr<TH1> shape, bool set_rate, const bool& merge_under_overflow) {
   // We were given a nullptr - this is fine, and so we're done
   if (!shape) {
     // This will safely release any existing TH1 held by shape_
@@ -84,14 +84,29 @@ void Process::set_shape(std::unique_ptr<TH1> shape, bool set_rate) {
   shape_ = std::move(shape);
   // Ensure that root will not try and clean this up
   shape_->SetDirectory(0);
+
+  if(merge_under_overflow){
+    double underflow = shape_->GetBinContent(0);
+    double underflow_err = shape_->GetBinError(0);
+    shape_->SetBinContent(1, shape_->GetBinContent(1) + underflow);
+    underflow_err = TMath::Power(TMath::Power(underflow_err, 2) + TMath::Power(shape_->GetBinError(1), 2), 0.5);
+    shape_->SetBinError(1, underflow_err);
+
+    int nbins = shape_->GetNbinsX();
+    double overflow = shape_->GetBinContent(nbins+1);
+    double overflow_err = shape_->GetBinError(nbins+1);
+    shape_->SetBinContent(nbins, shape_->GetBinContent(nbins) + overflow);
+    overflow_err = TMath::Power(TMath::Power(overflow_err, 2) + TMath::Power(shape_->GetBinError(nbins), 2), 0.5);
+    shape_->SetBinError(nbins, overflow_err);
+  }
   if (set_rate) {
     this->set_rate(shape_->Integral());
   }
   if (shape_->Integral() > 0.) shape_->Scale(1. / shape_->Integral());
 }
 
-void Process::set_shape(TH1 const& shape, bool set_rate) {
-  set_shape(std::unique_ptr<TH1>(static_cast<TH1*>(shape.Clone())), set_rate);
+void Process::set_shape(TH1 const& shape, bool set_rate, const bool& merge_under_overflow) {
+  set_shape(std::unique_ptr<TH1>(static_cast<TH1*>(shape.Clone())), set_rate, merge_under_overflow);
 }
 
 

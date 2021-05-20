@@ -2,6 +2,7 @@
 #include <iostream>
 #include "boost/format.hpp"
 #include "CombineHarvester/CombineTools/interface/Logging.h"
+#include "TMath.h"
 
 namespace ch {
 
@@ -48,7 +49,7 @@ Observation& Observation::operator=(Observation other) {
   return (*this);
 }
 
-void Observation::set_shape(std::unique_ptr<TH1> shape, bool set_rate) {
+void Observation::set_shape(std::unique_ptr<TH1> shape, bool set_rate, const bool& merge_under_overflow) {
   // We were given a nullptr - this is fine, and so we're done
   if (!shape) {
     // This will safely release any existing TH1 held by shape_
@@ -66,14 +67,25 @@ void Observation::set_shape(std::unique_ptr<TH1> shape, bool set_rate) {
   shape_ = std::move(shape);
   // Ensure that root will not try and clean this up
   shape_->SetDirectory(0);
+
+  if(merge_under_overflow){
+    double underflow = shape_->GetBinContent(0);
+    shape_->SetBinContent(1, shape_->GetBinContent(1) + underflow);
+    shape_->SetBinError(1, TMath::Power(shape_->GetBinContent(1), 0.5));
+
+    int nbins = shape_->GetNbinsX();
+    double overflow = shape_->GetBinContent(nbins+1);
+    shape_->SetBinContent(nbins, shape_->GetBinContent(nbins) + overflow);
+    shape_->SetBinError(nbins, TMath::Power(shape_->GetBinContent(nbins), 0.5));
+  }
   if (set_rate) {
     this->set_rate(shape_->Integral());
   }
   if (shape_->Integral() > 0.) shape_->Scale(1. / shape_->Integral());
 }
 
-void Observation::set_shape(TH1 const& shape, bool set_rate) {
-  set_shape(std::unique_ptr<TH1>(static_cast<TH1*>(shape.Clone())), set_rate);
+void Observation::set_shape(TH1 const& shape, bool set_rate, const bool& merge_under_overflow) {
+  set_shape(std::unique_ptr<TH1>(static_cast<TH1*>(shape.Clone())), set_rate, merge_under_overflow );
 }
 
 std::unique_ptr<TH1> Observation::ClonedShape() const {

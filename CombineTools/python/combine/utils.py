@@ -56,17 +56,20 @@ def prefit_from_workspace(file, workspace, params, setPars=None):
     ROOT.RooMsgService.instance().setGlobalKillBelow(ROOT.RooFit.WARNING)
     if setPars is not None:
       parsToSet = [tuple(x.split('=')) for x in setPars.split(',')]
-      allParams = ws.allVars()
-      allParams.add(ws.allCats())
       for par, val in parsToSet:
-        tmp = allParams.find(par)
-        isrvar = tmp.IsA().InheritsFrom(ROOT.RooRealVar.Class())
-        if isrvar:
-          print 'Setting parameter %s to %g' % (par, float(val))
-          tmp.setVal(float(val))
-        else:
-          print 'Setting index %s to %g' % (par, float(val))
-          tmp.setIndex(int(val))
+          print(par)
+          these_pars = [par]
+          if par.startswith('rgx{'):
+              regex_string = par.replace('rgx{', "")[:-1]
+              regex = re.compile(regex_string)
+              these_pars = [p for p in params if regex.match(p)]
+          elif par.startswith('"rgx{'):
+              regex_string = par.replace('"rgx{', "")[:-2]
+              regex = re.compile(regex_string)
+              these_pars = [p for p in params if regex.match(p)]
+          for p in these_pars:
+              print 'Setting paramter %s to %g' % (p, float(val))
+              ws.var(par).setVal(float(val))
 
     for p in params:
         res[p] = {}
@@ -117,7 +120,7 @@ def get_singles_results(file, scanned, columns):
     Note: relies on the list of parameters that were run (scanned) being correct"""
     res = {}
     f = ROOT.TFile(file)
-    if f is None or f.IsZombie():
+    if f is None or f.IsZombie() or f.TestBit(ROOT.TFile.kRecovered):
         return None
     t = f.Get("limit")
     for i, param in enumerate(scanned):

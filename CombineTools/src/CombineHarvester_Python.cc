@@ -158,10 +158,10 @@ void (CombineHarvester::*Overload_AddBinByBin)(
     double, bool, CombineHarvester &) = &CombineHarvester::AddBinByBin;
 
 void (Observation::*Overload_Obs_set_shape)(
-    TH1 const&, bool) = &Observation::set_shape;
+    TH1 const&, bool, bool const&) = &Observation::set_shape;
 
 void (Process::*Overload_Proc_set_shape)(
-    TH1 const&, bool) = &Process::set_shape;
+    TH1 const&, bool, bool const&) = &Process::set_shape;
 
 void (Systematic::*Overload_Syst_set_shapes)(
     TH1 const&, TH1 const&, TH1 const&) = &Systematic::set_shapes;
@@ -337,8 +337,6 @@ BOOST_PYTHON_MODULE(libCombineHarvesterCombineTools)
       .def("RemoveGroup", &CombineHarvester::RemoveGroup)
       .def("AddDatacardLineAtEnd", &CombineHarvester::AddDatacardLineAtEnd)
       .def("ClearDatacardLinesAtEnd", &CombineHarvester::ClearDatacardLinesAtEnd)
-      .def("getParFromWs",&CombineHarvester::getParFromWs)
-      .def("setParInWs",&CombineHarvester::setParInWs)
       // Evaluation
       .def("GetRate", &CombineHarvester::GetRate)
       .def("GetObservedRate", &CombineHarvester::GetObservedRate)

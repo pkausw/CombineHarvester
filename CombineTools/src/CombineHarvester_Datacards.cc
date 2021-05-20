@@ -37,6 +37,7 @@ int CombineHarvester::ParseDatacard(std::string const& filename,
   boost::replace_all(parse_rules, "$ERA",       "(?<ERA>[\\w\\.]+)");
   boost::replace_all(parse_rules, "$CHANNEL",   "(?<CHANNEL>[\\w\\.]+)");
   boost::replace_all(parse_rules, "$BINID",     "(?<BINID>[\\w\\.]+)");
+  boost::replace_all(parse_rules, "$BIN",     "(?<BIN>[\\w\\.]+)");
   boost::replace_all(parse_rules, "$MASS",      "(?<MASS>[\\w\\.]+)");
   boost::regex rgx(parse_rules);
   boost::smatch matches;
@@ -398,8 +399,6 @@ int CombineHarvester::ParseDatacard(std::string const& filename,
           process_id = boost::lexical_cast<int>(words[r-1][p]);
           process = words[r-2][p];
         }
-
-        // prepare input expression for bins as regex input
         auto current_exp = words[i][2];
         EscapeRegex(current_exp);
         boost::replace_all(current_exp, "\\*",      ".*");
@@ -410,8 +409,9 @@ int CombineHarvester::ParseDatacard(std::string const& filename,
         if(boost::regex_search(bin, bin_matches, rgx_bin)){
           matches_bin = true;
         }
-
-        // prepare input expression for processes as regex input
+        // if (words[i][2] == "*" || words[i][2] == bin) {
+        //   matches_bin = true;
+        // }
         current_exp = words[i][3];
         EscapeRegex(current_exp);
         boost::replace_all(current_exp, "\\*",      ".*");
@@ -422,7 +422,9 @@ int CombineHarvester::ParseDatacard(std::string const& filename,
         if(boost::regex_search(process, proc_matches, rgx_proc)){
           matches_proc = true;
         }
-
+        // if (words[i][3] == "*" || words[i][3] == process) {
+        //   matches_proc = true;
+        // }
         if (!matches_bin || !matches_proc) continue;
         auto sys = std::make_shared<Systematic>();
         sys->set_bin(bin);
@@ -516,15 +518,21 @@ int CombineHarvester::ParseDatacard(std::string const& filename,
           sys->set_scale(boost::lexical_cast<double>(words[i][p]));
           LoadShapes(sys.get(), hist_mapping);
         } else if (sys->type() == "shape?") {
-          // This might fail, so we have to "try"
-          try {
-            LoadShapes(sys.get(), hist_mapping);
-          } catch (std::exception & e) {
-            if (verbosity_ > 0) {
-              LOGLINE(log(), "Systematic with shape? did not resolve to a shape");
-              log() << e.what();
+          
+          // if down value was found, it's probably a rate uncertainty
+          // -> don't look for a shape
+          if (sys->value_d() == 0){ 
+            // This might fail, so we have to "try"            
+            try {
+              LoadShapes(sys.get(), hist_mapping);
+            } catch (std::exception & e) {
+              if (verbosity_ > 0) {
+                LOGLINE(log(), "Systematic with shape? did not resolve to a shape");
+                log() << e.what();
+              }
             }
           }
+          
           if (!sys->shape_u() || !sys->shape_d()) {
             sys->set_type("lnN");
           } else {

@@ -7,6 +7,7 @@
 #include "RooAbsReal.h"
 #include "RooAbsData.h"
 #include "RooRealVar.h"
+#include "TMath.h"
 #include "CombineHarvester/CombineTools/interface/MakeUnique.h"
 #include "CombineHarvester/CombineTools/interface/Object.h"
 
@@ -45,9 +46,9 @@ class Process : public Object {
    */
   double no_norm_rate() const { return rate_; }
 
-  void set_shape(std::unique_ptr<TH1> shape, bool set_rate);
+  void set_shape(std::unique_ptr<TH1> shape, bool set_rate, const bool& merge_under_overflow = false);
 
-  void set_shape(TH1 const& shape, bool set_rate);
+  void set_shape(TH1 const& shape, bool set_rate, const bool& merge_under_overflow = false);
 
   TH1 const* shape() const { return shape_.get(); }
 

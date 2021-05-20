@@ -14,6 +14,7 @@
 #include "TDirectory.h"
 #include "TH1.h"
 #include "TH2.h"
+#include "TString.h"
 #include "CombineHarvester/CombineTools/interface/Observation.h"
 #include "CombineHarvester/CombineTools/interface/Process.h"
 #include "CombineHarvester/CombineTools/interface/Systematic.h"
@@ -134,8 +135,10 @@ TH1F CombineHarvester::GetShapeWithUncertainty(RooFitResult const& fit,
                                                unsigned n_samples) {
   auto lookup = GenerateProcSystMap();
   TH1F shape = GetShapeInternal(lookup);
+  std::vector<std::string> full_rand_shape_summary;
   for (int i = 1; i <= shape.GetNbinsX(); ++i) {
     shape.SetBinError(i, 0.0);
+    full_rand_shape_summary.push_back("");
   }
   // Create a backup copy of the current parameter values
   auto backup = GetParameters();
@@ -152,22 +155,51 @@ TH1F CombineHarvester::GetShapeWithUncertainty(RooFitResult const& fit,
   for (unsigned n = 0; n < p_vec.size(); ++n) {
     r_vec[n] = dynamic_cast<RooRealVar const*>(rands.at(n));
     p_vec[n] = GetParameter(r_vec[n]->GetName());
+    // if(! p_vec[n]) std::cout << "could not initialize parameter '" << r_vec[n]->GetName() << "'" << std::endl;
   }
 
+  TString tmp;
+  
   // Main loop through n_samples
   for (unsigned i = 0; i < n_samples; ++i) {
     // Randomise and update values
     fit.randomizePars();
+    std::string rand_shape_summary = "";
     for (int n = 0; n < n_pars; ++n) {
-      if (p_vec[n]) p_vec[n]->set_val(r_vec[n]->getVal());
+      if (p_vec[n] && !p_vec[n]->frozen()) {
+        p_vec[n]->set_val(r_vec[n]->getVal());
+        tmp.Form("setting parameter '%s' to %f\n", p_vec[n]->name().c_str(), r_vec[n]->getVal());
+        // std::cout << tmp.Data();
+        rand_shape_summary = tmp.Data();
+        // std::cout << rand_shape_summary.c_str() << std::endl;
+        TH1F rand_shape = this->GetShapeInternal(lookup);
+        for (int j = 1; j <= rand_shape.GetNbinsX(); ++j) {
+          tmp.Form("\tBin Content: %f\n", rand_shape.GetBinContent(j));
+          // std::cout << tmp.Data();
+          full_rand_shape_summary.at(j) += rand_shape_summary;
+          full_rand_shape_summary.at(j) += tmp.Data();
+        }
+      }
+      // else if (!p_vec[n]) {
+      //   std::cout << "could not find parameter '" << r_vec[n]->GetName() << "'"<< std::endl;
+      // }
     }
-
     TH1F rand_shape = this->GetShapeInternal(lookup);
-    for (int i = 1; i <= shape.GetNbinsX(); ++i) {
+    for (int j = 1; j <= shape.GetNbinsX(); ++j) {
+      
       double err =
-          std::fabs(rand_shape.GetBinContent(i) - shape.GetBinContent(i));
-      shape.SetBinError(i, err*err + shape.GetBinError(i));
+          std::fabs(rand_shape.GetBinContent(j) - shape.GetBinContent(j));
+      if (std::fabs(err/shape.GetBinContent(j)) >= 0.5){
+        std::cout << "rel. error > 0.5 detected in bin " << j << " for toy " << i << std::endl;
+        std::cout << "nominal bin content (" << j << "):\t" << shape.GetBinContent(j) <<std::endl;
+        std::cout << "randomized bin content (" << j << "):\t" << rand_shape.GetBinContent(j) <<std::endl;
+        std::cout << "parameters: " << std::endl;
+        std::cout << "random shape evolution" << std::endl;
+        std::cout << full_rand_shape_summary.at(j).c_str() << std::endl;
+      }
+      shape.SetBinError(j, err*err + shape.GetBinError(j));
     }
+    this->UpdateParameters(backup);
   }
   for (int i = 1; i <= shape.GetNbinsX(); ++i) {
     shape.SetBinError(i, std::sqrt(shape.GetBinError(i)/double(n_samples)));
@@ -609,7 +641,7 @@ void CombineHarvester::VariableRebin(std::vector<double> bins) {
       prev_proc_rates[i] = procs_[i]->no_norm_rate();
       std::unique_ptr<TH1> copy2(copy->Rebin(bins.size()-1, "", &(bins[0])));
       // The process shape & rate will be reset here
-      procs_[i]->set_shape(std::move(copy2), true);
+      procs_[i]->set_shape(std::move(copy2), true, this->GetFlag("merge-under-overflow-bins"));
       scaled_procs[i] = procs_[i]->ClonedScaledShape();
     }
   }
@@ -617,7 +649,7 @@ void CombineHarvester::VariableRebin(std::vector<double> bins) {
     if (obs_[i]->shape()) {
       std::unique_ptr<TH1> copy(obs_[i]->ClonedScaledShape());
       std::unique_ptr<TH1> copy2(copy->Rebin(bins.size()-1, "", &(bins[0])));
-      obs_[i]->set_shape(std::move(copy2), true);
+      obs_[i]->set_shape(std::move(copy2), true, this->GetFlag("merge-under-overflow-bins"));
     }
   }
   for (unsigned i = 0; i < systs_.size(); ++i) {

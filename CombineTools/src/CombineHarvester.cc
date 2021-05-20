@@ -24,6 +24,7 @@ CombineHarvester::CombineHarvester() : verbosity_(0), log_(&(std::cout)) {
   flags_["workspace-uuid-recycle"] = true;
   flags_["import-parameter-err"] = true;
   flags_["filters-use-regex"] = false;
+  flags_["merge-under-overflow-bins"] = false;
   // std::cout << "[CombineHarvester] Constructor called for " << this << "\n";
 }
 
@@ -891,27 +892,4 @@ void CombineHarvester::AddExtArgValue(std::string const& name, double const& val
   param->set_err_u(0.);
   param->set_err_d(0.);
 }
-
-double CombineHarvester::getParFromWs(const std::string name){
-    double r=0.; bool found=false;
-      for (auto & item : wspaces_) { 
-          if (item.second.get()->var(name.c_str())) {
-              if (found) std::cout<<"WARNING-DUPLICATE: ALREADY FOUND "<<name<<"in an other ws"<<r<<std::endl;
-              r=item.second.get()->var(name.c_str())->getVal();
-              found=true;
-          }
-      }
-      return r; 
-  }
-
-void CombineHarvester::setParInWs(const std::string name,double value) {
-    for (auto & item : wspaces_) { 
-        if (item.second.get()->var(name.c_str())){
-            if ( item.second.get()->var(name.c_str())->getMin() >value) item.second.get()->var(name.c_str())->setMin(value-0.001);
-            if ( item.second.get()->var(name.c_str())->getMax() <value) item.second.get()->var(name.c_str())->setMax(value+0.001);
-            item.second.get()->var(name.c_str())->setVal(value); 
-        }
-    }
-  }
-
 }
