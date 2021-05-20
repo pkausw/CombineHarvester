@@ -176,8 +176,8 @@ TH1F CombineHarvester::GetShapeWithUncertainty(RooFitResult const& fit,
         for (int j = 1; j <= rand_shape.GetNbinsX(); ++j) {
           tmp.Form("\tBin Content: %f\n", rand_shape.GetBinContent(j));
           // std::cout << tmp.Data();
-          full_rand_shape_summary.at(j) += rand_shape_summary;
-          full_rand_shape_summary.at(j) += tmp.Data();
+          full_rand_shape_summary.at(j-1) += rand_shape_summary;
+          full_rand_shape_summary.at(j-1) += tmp.Data();
         }
       }
       // else if (!p_vec[n]) {
@@ -195,7 +195,7 @@ TH1F CombineHarvester::GetShapeWithUncertainty(RooFitResult const& fit,
         std::cout << "randomized bin content (" << j << "):\t" << rand_shape.GetBinContent(j) <<std::endl;
         std::cout << "parameters: " << std::endl;
         std::cout << "random shape evolution" << std::endl;
-        std::cout << full_rand_shape_summary.at(j).c_str() << std::endl;
+        std::cout << full_rand_shape_summary.at(j-1).c_str() << std::endl;
       }
       shape.SetBinError(j, err*err + shape.GetBinError(j));
     }
